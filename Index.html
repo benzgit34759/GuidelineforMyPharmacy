@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการแนวทางการรักษาโรคของร้านยา</title>
+    <!-- Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            color: #334155;
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        .animate-fade-in-up {
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+        .animate-fade-out-down {
+            animation: fadeOutDown 0.5s ease-out forwards;
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        @keyframes fadeOutDown {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-6 md:p-8 lg:p-10 flex flex-col items-center min-h-screen">
+    <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg w-full max-w-4xl mb-8">
+        <h1 class="text-2xl sm:text-3xl font-bold text-center text-blue-700 mb-6">
+            ระบบจัดการแนวทางการรักษาโรคของร้านยา
+        </h1>
+
+        <!-- Input Section for Age Group -->
+        <div class="mb-6 p-4 border border-blue-200 rounded-lg bg-blue-50">
+            <h2 class="text-xl font-semibold text-blue-600 mb-4">เพิ่มกลุ่มอายุ</h2>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input type="text" id="ageGroupInput" placeholder="เช่น เด็ก, ผู้ใหญ่"
+                       class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="addAgeGroupBtn"
+                        class="bg-blue-600 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105">
+                    เพิ่มกลุ่มอายุ
+                </button>
+            </div>
+        </div>
+
+        <!-- Display Area for Age Groups, Symptoms and Regimens -->
+        <div class="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">แนวทางการรักษาปัจจุบัน</h2>
+            <div id="treatmentGuidelinesDisplay" class="space-y-6">
+                <!-- Data will be rendered here -->
+                <p class="text-gray-500 text-center" id="noDataMessage">
+                    ยังไม่มีข้อมูลแนวทางการรักษา กรุณาเพิ่มกลุ่มอายุ
+                </p>
+            </div>
+        </div>
+
+        <!-- Action Buttons: Export and Import -->
+        <div class="flex flex-col sm:flex-row justify-center gap-4 mt-8">
+            <button id="exportDataBtn"
+                    class="bg-green-600 text-white px-6 py-3 rounded-lg shadow hover:bg-green-700 transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Export ข้อมูล (JSON)
+            </button>
+            <label for="importFileInput"
+                   class="bg-purple-600 text-white px-6 py-3 rounded-lg shadow hover:bg-purple-700 transition duration-300 ease-in-out transform hover:scale-105 cursor-pointer flex items-center justify-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                Import ข้อมูล (JSON)
+            </label>
+            <input type="file" id="importFileInput" accept=".json" class="hidden">
+        </div>
+    </div>
+
+    <!-- Message Box for alerts -->
+    <div id="messageBox" class="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-3 rounded-lg shadow-lg hidden z-50">
+        <span id="messageText"></span>
+        <button id="closeMessageBox" class="ml-4 text-gray-400 hover:text-white">&times;</button>
+    </div>
+
+    <script>
+        // Array to store all treatment guidelines, now structured by age group
+        let treatmentGuidelines = []; // [{ ageGroup: "เด็ก", symptoms: [] }, { ageGroup: "ผู้ใหญ่", symptoms: [] }]
+
+        // Get DOM elements
+        const ageGroupInput = document.getElementById('ageGroupInput');
+        const addAgeGroupBtn = document.getElementById('addAgeGroupBtn');
+        const treatmentGuidelinesDisplay = document.getElementById('treatmentGuidelinesDisplay');
+        const noDataMessage = document.getElementById('noDataMessage');
+        const exportDataBtn = document.getElementById('exportDataBtn');
+        const importFileInput = document.getElementById('importFileInput');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+        const closeMessageBox = document.getElementById('closeMessageBox');
+
+        // Function to show a custom message box
+        function showMessage(message, type = 'info') {
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden', 'bg-red-600', 'bg-green-600', 'bg-gray-800');
+            if (type === 'error') {
+                messageBox.classList.add('bg-red-600');
+            } else if (type === 'success') {
+                messageBox.classList.add('bg-green-600');
+            } else {
+                messageBox.classList.add('bg-gray-800');
+            }
+            messageBox.classList.add('animate-fade-in-up'); // Simple animation
+            setTimeout(() => {
+                messageBox.classList.remove('animate-fade-in-up');
+                messageBox.classList.add('animate-fade-out-down');
+                setTimeout(() => {
+                    messageBox.classList.add('hidden');
+                    messageBox.classList.remove('animate-fade-out-down');
+                }, 500); // Duration of fade-out animation
+            }, 3000); // Message visible for 3 seconds
+        }
+
+        // Close message box manually
+        closeMessageBox.addEventListener('click', () => {
+            messageBox.classList.add('hidden');
+        });
+
+        // Function to render all treatment guidelines to the display area
+        function renderGuidelines() {
+            treatmentGuidelinesDisplay.innerHTML = ''; // Clear previous content
+            if (treatmentGuidelines.length === 0) {
+                noDataMessage.classList.remove('hidden');
+                return;
+            }
+            noDataMessage.classList.add('hidden');
+
+            treatmentGuidelines.forEach((ageGroupData, ageIndex) => {
+                // Create a div for each age group
+                const ageGroupDiv = document.createElement('div');
+                ageGroupDiv.className = 'bg-blue-100 p-4 rounded-lg shadow-md mb-6 border border-blue-200';
+                ageGroupDiv.innerHTML = `
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-blue-800">${ageGroupData.ageGroup}</h3>
+                        <button data-age-index="${ageIndex}" class="delete-age-group-btn text-red-500 hover:text-red-700 transition duration-300 ease-in-out">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                    <div class="main-symptoms-container pl-4 border-l-2 border-blue-200 space-y-6">
+                        <!-- Main symptoms will be appended here -->
+                    </div>
+                    <div class="mt-4 flex flex-col sm:flex-row gap-4">
+                        <input type="text" placeholder="เพิ่มอาการหลัก เช่น มีไข้, ปวดหัว"
+                               class="main-symptom-input flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400">
+                        <button class="add-main-symptom-btn bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition duration-300 ease-in-out transform hover:scale-105"
+                                data-age-index="${ageIndex}">
+                            เพิ่มอาการหลัก
+                        </button>
+                    </div>
+                `;
+                treatmentGuidelinesDisplay.appendChild(ageGroupDiv);
+
+                const mainSymptomsContainer = ageGroupDiv.querySelector('.main-symptoms-container');
+                ageGroupData.symptoms.forEach((mainSymptom, mainIndex) => {
+                    const mainSymptomDiv = document.createElement('div');
+                    mainSymptomDiv.className = 'bg-white p-4 rounded-lg shadow-md mb-4 border border-gray-200';
+                    mainSymptomDiv.innerHTML = `
+                        <div class="flex justify-between items-center mb-4">
+                            <h4 class="text-lg font-bold text-gray-800">${mainSymptom.mainSymptom}</h4>
+                            <button data-age-index="${ageIndex}" data-main-index="${mainIndex}" class="delete-main-symptom-btn text-red-500 hover:text-red-700 transition duration-300 ease-in-out">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </div>
+                        <div class="subgroups-container pl-4 border-l-2 border-gray-200 space-y-4">
+                            <!-- Subgroups will be appended here -->
+                        </div>
+                        <div class="mt-4 flex flex-col sm:flex-row gap-4">
+                            <input type="text" placeholder="กลุ่มอาการย่อย เช่น มีไข้ + ท้องเสีย"
+                                   class="subgroup-input flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400">
+                            <input type="text" placeholder="Regimen (คั่นด้วยคอมม่า เช่น ORS, Lexflor)"
+                                   class="regimen-input flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400">
+                            <button class="add-subgroup-btn bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600 transition duration-300 ease-in-out transform hover:scale-105"
+                                    data-age-index="${ageIndex}" data-main-index="${mainIndex}">
+                                เพิ่มกลุ่มอาการย่อย
+                            </button>
+                        </div>
+                    `;
+                    mainSymptomsContainer.appendChild(mainSymptomDiv);
+
+                    const subgroupsContainer = mainSymptomDiv.querySelector('.subgroups-container');
+                    mainSymptom.subgroups.forEach((subgroup, subIndex) => {
+                        const subgroupDiv = document.createElement('div');
+                        subgroupDiv.className = 'bg-gray-100 p-3 rounded-lg shadow-sm border border-gray-200';
+                        subgroupDiv.innerHTML = `
+                            <div class="flex justify-between items-center mb-2">
+                                <p class="font-medium text-gray-700">${subgroup.subgroupName}</p>
+                                <button data-age-index="${ageIndex}" data-main-index="${mainIndex}" data-sub-index="${subIndex}" class="delete-subgroup-btn text-red-400 hover:text-red-600 transition duration-300 ease-in-out">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                            <ul class="list-disc list-inside text-sm text-gray-600">
+                                ${subgroup.regimen.map(item => `<li>${item}</li>`).join('')}
+                            </ul>
+                        `;
+                        subgroupsContainer.appendChild(subgroupDiv);
+                    });
+                });
+            });
+
+            // Attach event listeners for dynamically created buttons
+            attachEventListeners();
+        }
+
+        // Function to attach event listeners to dynamically created elements
+        function attachEventListeners() {
+            // Add Main Symptom Buttons
+            document.querySelectorAll('.add-main-symptom-btn').forEach(button => {
+                button.onclick = (event) => {
+                    const ageIndex = parseInt(event.target.dataset.ageIndex);
+                    const ageGroupDiv = event.target.closest('.bg-blue-100');
+                    const mainSymptomInput = ageGroupDiv.querySelector('.main-symptom-input');
+
+                    const mainSymptomText = mainSymptomInput.value.trim();
+
+                    if (mainSymptomText) {
+                        if (!treatmentGuidelines[ageIndex].symptoms) {
+                            treatmentGuidelines[ageIndex].symptoms = [];
+                        }
+                        // Check for duplicate main symptom within the same age group
+                        const exists = treatmentGuidelines[ageIndex].symptoms.some(item => item.mainSymptom === mainSymptomText);
+                        if (exists) {
+                            showMessage('มีอาการหลักนี้ในกลุ่มอายุนี้อยู่แล้ว กรุณาใช้อาการอื่น', 'error');
+                            return;
+                        }
+
+                        treatmentGuidelines[ageIndex].symptoms.push({ mainSymptom: mainSymptomText, subgroups: [] });
+                        renderGuidelines();
+                        mainSymptomInput.value = '';
+                        showMessage('เพิ่มอาการหลักสำเร็จ!', 'success');
+                    } else {
+                        showMessage('กรุณากรอกอาการหลัก', 'error');
+                    }
+                };
+            });
+
+            // Add Subgroup Buttons
+            document.querySelectorAll('.add-subgroup-btn').forEach(button => {
+                button.onclick = (event) => {
+                    const ageIndex = parseInt(event.target.dataset.ageIndex);
+                    const mainIndex = parseInt(event.target.dataset.mainIndex);
+                    const mainSymptomDiv = event.target.closest('.bg-white');
+                    const subgroupInput = mainSymptomDiv.querySelector('.subgroup-input');
+                    const regimenInput = mainSymptomDiv.querySelector('.regimen-input');
+
+                    const subgroupName = subgroupInput.value.trim();
+                    const regimen = regimenInput.value.split(',').map(item => item.trim()).filter(item => item !== '');
+
+                    if (subgroupName && regimen.length > 0) {
+                        if (!treatmentGuidelines[ageIndex].symptoms[mainIndex].subgroups) {
+                            treatmentGuidelines[ageIndex].symptoms[mainIndex].subgroups = [];
+                        }
+                        // Check for duplicate subgroup within the same main symptom
+                        const exists = treatmentGuidelines[ageIndex].symptoms[mainIndex].subgroups.some(item => item.subgroupName === subgroupName);
+                        if (exists) {
+                            showMessage('มีกลุ่มอาการย่อยนี้อยู่แล้ว กรุณาใช้ชื่ออื่น', 'error');
+                            return;
+                        }
+
+                        treatmentGuidelines[ageIndex].symptoms[mainIndex].subgroups.push({ subgroupName, regimen });
+                        renderGuidelines();
+                        subgroupInput.value = '';
+                        regimenInput.value = '';
+                        showMessage('เพิ่มกลุ่มอาการย่อยสำเร็จ!', 'success');
+                    } else {
+                        showMessage('กรุณากรอกข้อมูลกลุ่มอาการย่อยและ Regimen ให้ครบถ้วน', 'error');
+                    }
+                };
+            });
+
+            // Delete Age Group Buttons
+            document.querySelectorAll('.delete-age-group-btn').forEach(button => {
+                button.onclick = (event) => {
+                    const ageIndex = parseInt(event.target.dataset.ageIndex);
+                    if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบกลุ่มอายุนี้และข้อมูลทั้งหมดที่เกี่ยวข้อง?')) {
+                        treatmentGuidelines.splice(ageIndex, 1);
+                        renderGuidelines();
+                        showMessage('ลบกลุ่มอายุสำเร็จ!', 'success');
+                    }
+                };
+            });
+
+            // Delete Main Symptom Buttons
+            document.querySelectorAll('.delete-main-symptom-btn').forEach(button => {
+                button.onclick = (event) => {
+                    const ageIndex = parseInt(event.target.dataset.ageIndex);
+                    const mainIndex = parseInt(event.target.dataset.mainIndex);
+                    if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบอาการหลักนี้และกลุ่มอาการย่อยทั้งหมด?')) {
+                        treatmentGuidelines[ageIndex].symptoms.splice(mainIndex, 1);
+                        renderGuidelines();
+                        showMessage('ลบอาการหลักสำเร็จ!', 'success');
+                    }
+                };
+            });
+
+            // Delete Subgroup Buttons
+            document.querySelectorAll('.delete-subgroup-btn').forEach(button => {
+                button.onclick = (event) => {
+                    const ageIndex = parseInt(event.target.dataset.ageIndex);
+                    const mainIndex = parseInt(event.target.dataset.mainIndex);
+                    const subIndex = parseInt(event.target.dataset.subIndex);
+                    if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบกลุ่มอาการย่อยนี้?')) {
+                        treatmentGuidelines[ageIndex].symptoms[mainIndex].subgroups.splice(subIndex, 1);
+                        renderGuidelines();
+                        showMessage('ลบกลุ่มอาการย่อยสำเร็จ!', 'success');
+                    }
+                };
+            });
+        }
+
+        // Event listener for adding a new age group
+        addAgeGroupBtn.addEventListener('click', () => {
+            const ageGroupText = ageGroupInput.value.trim();
+            if (ageGroupText) {
+                // Check for duplicate age group
+                const exists = treatmentGuidelines.some(item => item.ageGroup === ageGroupText);
+                if (exists) {
+                    showMessage('มีกลุ่มอายุนี้อยู่แล้ว กรุณาใช้ชื่ออื่น', 'error');
+                    return;
+                }
+                treatmentGuidelines.push({ ageGroup: ageGroupText, symptoms: [] });
+                renderGuidelines();
+                ageGroupInput.value = ''; // Clear input
+                showMessage('เพิ่มกลุ่มอายุสำเร็จ!', 'success');
+            } else {
+                showMessage('กรุณากรอกกลุ่มอายุ', 'error');
+            }
+        });
+
+        // Event listener for exporting data
+        exportDataBtn.addEventListener('click', () => {
+            if (treatmentGuidelines.length === 0) {
+                showMessage('ไม่มีข้อมูลให้ Export', 'info');
+                return;
+            }
+            const dataStr = JSON.stringify({ treatmentGuidelines: treatmentGuidelines }, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'pharmacy_treatment_guidelines.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showMessage('Export ข้อมูลสำเร็จ!', 'success');
+        });
+
+        // Event listener for importing data
+        importFileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        if (importedData.treatmentGuidelines && Array.isArray(importedData.treatmentGuidelines)) {
+                            treatmentGuidelines = importedData.treatmentGuidelines;
+                            renderGuidelines();
+                            showMessage('Import ข้อมูลสำเร็จ!', 'success');
+                        } else {
+                            showMessage('โครงสร้างไฟล์ JSON ไม่ถูกต้อง', 'error');
+                        }
+                    } catch (error) {
+                        showMessage('ไม่สามารถอ่านไฟล์ JSON ได้: ' + error.message, 'error');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Initial render when the page loads
+        document.addEventListener('DOMContentLoaded', renderGuidelines);
+    </script>
+</body>
+</html>
